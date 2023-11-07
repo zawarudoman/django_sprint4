@@ -10,9 +10,9 @@ app_name = 'blog'
 urlpatterns = [
     path(
         'posts/<int:post_id>/edit_comment/<int:comment_id>',
-         views.CommentUpdateViews.as_view(),
-         name='edit_comment'
-         ),
+        views.CommentUpdateViews.as_view(),
+        name='edit_comment'
+    ),
     path(
         'posts/<int:post_id>/delete_comment/<int:comment_id>/',
         views.CommentDeleteViews.as_view(),
