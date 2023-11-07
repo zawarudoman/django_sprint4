@@ -44,9 +44,7 @@ class IndexView(ListView):
             category__is_published=True
         ).annotate(
             comment_count=Count('comment')
-        ).order_by(
-                '-pub_date'
-        )
+        ).order_by('-pub_date')
 
 
 def category_posts(request, category_slug):
@@ -99,7 +97,9 @@ class PostCreateViews(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         """Update context"""
         context = super().get_context_data(**kwargs)
-        context['comment'] = self.object.comment.select_related('author') if self.object else 'avc'
+        context['comment'] = self.object.comment.select_related('author')\
+            if self.object \
+            else 'avc'
         return context
 
     def form_valid(self, form):
@@ -109,7 +109,10 @@ class PostCreateViews(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         """User translation after successful post create"""
-        return reverse_lazy('blog:profile', kwargs={'username': self.request.user})
+        return reverse_lazy(
+            'blog:profile',
+            kwargs={'username': self.request.user}
+        )
 
 
 class PostUpdateViews(LoginRequiredMixin, UpdateView):
@@ -136,7 +139,7 @@ class PostUpdateViews(LoginRequiredMixin, UpdateView):
         return reverse(
             'blog:post_detail',
             kwargs={'post_id': self.kwargs['post_id']}
-            )
+        )
 
 
 class PostDeleteViews(LoginRequiredMixin, DeleteView):
@@ -269,7 +272,10 @@ class CommentUpdateViews(LoginRequiredMixin, UpdateView):
 
     def get_success_url(self):
         """User translation after successful comment editing"""
-        return reverse('blog:post_detail', kwargs={'post_id': self.kwargs['post_id']})
+        return reverse(
+            'blog:post_detail',
+            kwargs={'post_id': self.kwargs['post_id']}
+        )
 
 
 class CommentDeleteViews(LoginRequiredMixin, DeleteView):
