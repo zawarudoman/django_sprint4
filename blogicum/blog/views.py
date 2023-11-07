@@ -126,6 +126,7 @@ class PostCreateViews(LoginRequiredMixin, CreateView):
 
 class PostUpdateViews(LoginRequiredMixin, UpdateView):
     """Post eding"""
+
     model = Post
     fields = ['title', 'text', 'image', 'pub_date', 'location', 'category']
     template_name = 'blog/create.html'
@@ -153,6 +154,7 @@ class PostUpdateViews(LoginRequiredMixin, UpdateView):
 
 class PostDeleteViews(LoginRequiredMixin, DeleteView):
     """Delete post"""
+
     model = Post
     success_url = reverse_lazy('blog:index')
     template_name = 'blog/create.html'
@@ -237,7 +239,10 @@ class ProfileUpdateViews(LoginRequiredMixin, UpdateView):
 
     def get_success_url(self):
         """User translation after successful  create"""
-        return reverse_lazy('blog:profile', kwargs={'username': self.request.user})
+        return reverse_lazy(
+            'blog:profile',
+            kwargs={'username': self.request.user}
+        )
 
 
 class CommentCreateViews(LoginRequiredMixin, CreateView):
