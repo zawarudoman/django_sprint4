@@ -22,6 +22,8 @@ PAGINATOR_NUM = 10
 
 
 class CommentFormMixin:
+    """Comment Mixin for delete and update view"""
+
     model = Comment
     pk_url_kwarg = 'comment_id'
     template_name = 'blog/comment.html'
@@ -31,6 +33,7 @@ class CommentFormMixin:
         if self.get_object().author != self.request.user:
             return redirect('blog:index')
         return super().dispatch(request, *args, **kwargs)
+
 
 class IndexView(ListView):
     """Homepage"""
@@ -54,7 +57,7 @@ def category_posts(request, category_slug):
         is_published=True
     )
     post = get_request().filter(category=category).annotate(
-            comment_count=Count('comments')).order_by('-pub_date')
+        comment_count=Count('comments')).order_by('-pub_date')
     paginator = Paginator(post, PAGINATOR_NUM)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -71,7 +74,9 @@ class PostDetailViews(DetailView):
 
     def get_object(self, queryset=None):
         """Checking for user access to editing a post"""
-        post_object = super(PostDetailViews, self).get_object(queryset=queryset)
+        post_object = super(PostDetailViews, self).get_object(
+            queryset=queryset
+        )
         if post_object.author != self.request.user:
             if (
                 not post_object.is_published
@@ -110,8 +115,8 @@ class PostCreateViews(LoginRequiredMixin, CreateView):
 
 
 class PostUpdateViews(LoginRequiredMixin, UpdateView):
-
     """Post eding"""
+
     model = Post
     form_class = CreatePostForm
     template_name = 'blog/create.html'
@@ -240,6 +245,7 @@ class CommentCreateViews(LoginRequiredMixin, CreateView):
 
 class CommentUpdateViews(LoginRequiredMixin, CommentFormMixin, UpdateView):
     """Coment update"""
+
     form_class = CommentForm
 
     def get_success_url(self):
@@ -252,6 +258,5 @@ class CommentUpdateViews(LoginRequiredMixin, CommentFormMixin, UpdateView):
 
 class CommentDeleteViews(LoginRequiredMixin, CommentFormMixin, DeleteView):
     """Comment delete and redirect homepage"""
+
     success_url = reverse_lazy('blog:index')
-
-

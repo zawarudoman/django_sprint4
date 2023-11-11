@@ -99,7 +99,9 @@ class Post(PublishedAndCreated):
 
     def image_tag(self):
         if self.image:
-            return mark_safe(f'<img src="/{self.image}" width="150" height="150" />')
+            return mark_safe(
+                f'<img src="/{self.image}" width="150" height="150" />'
+            )
 
     image_tag.short_description = 'Image'
 
