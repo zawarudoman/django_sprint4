@@ -15,22 +15,22 @@ from django.views.generic import (
 
 from blog.forms import CommentForm, CreatePostForm, UserForm
 from blog.models import Category, Comment, Post, User
+from blog.utils import get_request
 
 
 PAGINATOR_NUM = 10
 
 
-def get_request():
-    return Post.objects.select_related(
-        "category",
-        "location",
-        "author"
-    ).filter(
-        is_published=True,
-        category__is_published=True,
-        pub_date__lte=timezone.now()
-    )
+class CommentFormMixin:
+    model = Comment
+    pk_url_kwarg = 'comment_id'
+    template_name = 'blog/comment.html'
 
+    def dispatch(self, request, *args, **kwargs):
+        """Сhecking the user for the authorship of the comment"""
+        if self.get_object().author != self.request.user:
+            return redirect('blog:index')
+        return super().dispatch(request, *args, **kwargs)
 
 class IndexView(ListView):
     """Homepage"""
@@ -41,16 +41,8 @@ class IndexView(ListView):
 
     def get_queryset(self):
         """Post"""
-        return Post.objects.select_related(
-            'location',
-            'author',
-            'category'
-        ).filter(
-            pub_date__lte=timezone.now(),
-            is_published=True,
-            category__is_published=True
-        ).annotate(
-            comment_count=Count('comment')
+        return get_request().annotate(
+            comment_count=Count('comments')
         ).order_by('-pub_date')
 
 
@@ -61,7 +53,8 @@ def category_posts(request, category_slug):
         slug=category_slug,
         is_published=True
     )
-    post = get_request().filter(category=category)
+    post = get_request().filter(category=category).annotate(
+            comment_count=Count('comments')).order_by('-pub_date')
     paginator = Paginator(post, PAGINATOR_NUM)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -69,30 +62,30 @@ def category_posts(request, category_slug):
     return render(request, "blog/category.html", context)
 
 
-class PostDetailViews(LoginRequiredMixin, DetailView):
+class PostDetailViews(DetailView):
     """Post detail"""
 
     model = Post
     template_name = 'blog/detail.html'
     pk_url_kwarg = 'post_id'
 
-    def dispatch(self, request, *args, **kwargs):
+    def get_object(self, queryset=None):
         """Checking for user access to editing a post"""
-        post_object = self.get_object()
+        post_object = super(PostDetailViews, self).get_object(queryset=queryset)
         if post_object.author != self.request.user:
             if (
-                    not post_object.is_published
-                    or not post_object.category.is_published
-                    or post_object.pub_date > timezone.now()
+                not post_object.is_published
+                or not post_object.category.is_published
+                or post_object.pub_date > timezone.now()
             ):
                 raise Http404
-        return super().dispatch(request, *args, **kwargs)
+        return post_object
 
     def get_context_data(self, **kwargs):
         """Update context"""
         context = super().get_context_data(**kwargs)
         context['form'] = CommentForm()
-        context['comments'] = (self.object.comment.select_related('author'))
+        context['comments'] = self.object.comments.select_related('author')
         return context
 
 
@@ -100,16 +93,8 @@ class PostCreateViews(LoginRequiredMixin, CreateView):
     """Post create"""
 
     model = Post
-    fields = ['title', 'text', 'image', 'pub_date', 'location', 'category']
+    form_class = CreatePostForm
     template_name = 'blog/create.html'
-
-    def get_context_data(self, **kwargs):
-        """Update context"""
-        context = super().get_context_data(**kwargs)
-        context['comment'] = self.object.comment.select_related('author')\
-            if self.object \
-            else 'avc'
-        return context
 
     def form_valid(self, form):
         """Form validity check"""
@@ -118,17 +103,17 @@ class PostCreateViews(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         """User translation after successful post create"""
-        return reverse_lazy(
+        return reverse(
             'blog:profile',
             kwargs={'username': self.request.user}
         )
 
 
 class PostUpdateViews(LoginRequiredMixin, UpdateView):
-    """Post eding"""
 
+    """Post eding"""
     model = Post
-    fields = ['title', 'text', 'image', 'pub_date', 'location', 'category']
+    form_class = CreatePostForm
     template_name = 'blog/create.html'
     pk_url_kwarg = 'post_id'
 
@@ -136,12 +121,6 @@ class PostUpdateViews(LoginRequiredMixin, UpdateView):
         """Checking for user access to editing a post"""
         if self.get_object().author != self.request.user:
             return redirect('blog:post_detail', post_id=self.kwargs['post_id'])
-        get_object_or_404(
-            Post,
-            pk=kwargs['post_id'],
-            is_published=True,
-            author=self.request.user
-        )
         return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
@@ -162,9 +141,8 @@ class PostDeleteViews(LoginRequiredMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         """Сhecking the user for the authorship of the post"""
-        if not request.user.is_authenticated:
-            return self.handle_no_permission()
-        get_object_or_404(Post, pk=kwargs['post_id'], author=request.user)
+        if not request.user.is_anonymous:
+            get_object_or_404(Post, pk=kwargs['post_id'], author=request.user)
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -197,19 +175,12 @@ class ProfileListViews(ListView):
                 author=user
             ).order_by(
                 '-pub_date'
-            ).annotate(comment_count=Count('comment'))
-        return Post.objects.select_related(
-            'location',
-            'category',
-            'author'
-        ).filter(
-            is_published=True,
-            category__is_published=True,
-            pub_date__lte=timezone.now(),
+            ).annotate(comment_count=Count('comments'))
+        return get_request().filter(
             author=user
         ).order_by(
             '-pub_date'
-        ).annotate(comment_count=Count('comment'))
+        ).annotate(comment_count=Count('comments'))
 
     def get_context_data(self, **kwargs):
         """Update context"""
@@ -225,21 +196,16 @@ class ProfileListViews(ListView):
 class ProfileUpdateViews(LoginRequiredMixin, UpdateView):
     """Profile update"""
 
-    queryset = Post.objects.select_related()
     form_class = UserForm
     template_name = 'blog/user.html'
-    slug_field = 'username'
-    slug_url_kwarg = 'username'
-    context_object_name = 'username'
 
     def get_object(self, queryset=None):
         """Getting the username object"""
-        slug = self.kwargs['username']
-        return get_object_or_404(User, username=slug)
+        return self.request.user
 
     def get_success_url(self):
         """User translation after successful  create"""
-        return reverse_lazy(
+        return reverse(
             'blog:profile',
             kwargs={'username': self.request.user}
         )
@@ -253,44 +219,28 @@ class CommentCreateViews(LoginRequiredMixin, CreateView):
     form_class = CommentForm
     template_name = 'blog/comment.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        """Сhecking post availability"""
-        self.posts = get_object_or_404(
-            Post,
-            pk=kwargs['post_id'],
-            category__is_published=True,
-            is_published=True
-        )
-        return super().dispatch(request, args, kwargs)
-
     def form_valid(self, form):
         """Form validity check"""
         form.instance.author = self.request.user
-        form.instance.post = self.posts
+        form.instance.post = get_object_or_404(
+            Post,
+            pk=self.kwargs['post_id'],
+            category__is_published=True,
+            is_published=True
+        )
         return super().form_valid(form)
 
     def get_success_url(self):
         """User translation after successful comment create"""
         return reverse(
             'blog:post_detail',
-            kwargs={'post_id': self.posts.id}
+            kwargs={'post_id': self.kwargs['post_id']}
         )
 
 
-class CommentUpdateViews(LoginRequiredMixin, UpdateView):
+class CommentUpdateViews(LoginRequiredMixin, CommentFormMixin, UpdateView):
     """Coment update"""
-
-    model = Comment
-    fields = ('comment',)
-    pk_url_kwarg = 'comment_id'
-    template_name = 'blog/comment.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        """Сhecking the user for the authorship of the comment"""
-        comment_obj = get_object_or_404(Comment, id=kwargs['comment_id'])
-        if comment_obj.author != self.request.user:
-            return redirect('blog:index')
-        return super().dispatch(request, *args, **kwargs)
+    form_class = CommentForm
 
     def get_success_url(self):
         """User translation after successful comment editing"""
@@ -300,17 +250,8 @@ class CommentUpdateViews(LoginRequiredMixin, UpdateView):
         )
 
 
-class CommentDeleteViews(LoginRequiredMixin, DeleteView):
+class CommentDeleteViews(LoginRequiredMixin, CommentFormMixin, DeleteView):
     """Comment delete and redirect homepage"""
-
-    model = Comment
     success_url = reverse_lazy('blog:index')
-    pk_url_kwarg = 'comment_id'
-    template_name = 'blog/comment.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        """Сhecking the user for the authorship of the comment"""
-        comment_obj = get_object_or_404(Comment, id=kwargs['comment_id'])
-        if comment_obj.author != self.request.user:
-            return redirect('blog:index')
-        return super().dispatch(request, *args, **kwargs)
+

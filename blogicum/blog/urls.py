@@ -1,5 +1,3 @@
-from django.conf.urls.static import static
-from django.conf import settings
 from django.urls import path
 
 from . import views
@@ -20,14 +18,14 @@ urlpatterns = [
     ),
     path('', views.IndexView.as_view(), name='index'),
     path(
+        'profile/edit/',
+        views.ProfileUpdateViews.as_view(),
+        name='edit_profile'
+    ),
+    path(
         'profile/<slug:username>/',
         views.ProfileListViews.as_view(),
         name='profile'
-    ),
-    path(
-        'profile/<slug:username>/edit/',
-        views.ProfileUpdateViews.as_view(),
-        name='edit_profile'
     ),
     path(
         'posts/create/',
@@ -58,4 +56,4 @@ urlpatterns = [
         'category/<slug:category_slug>/',
         views.category_posts,
         name='category_posts'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]

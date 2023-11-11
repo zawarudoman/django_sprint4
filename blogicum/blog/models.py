@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.utils.html import mark_safe
 
 User = get_user_model()
 
@@ -92,13 +93,23 @@ class Post(PublishedAndCreated):
     def __str__(self):
         return self.title[:NUMBER_OF_CHARACTERS_DISPLAYED]
 
+    def get_absolute_url(self):
+        from django.urls import reverse
+        return reverse('blog.detail', kwargs={'post_id': self.pk})
+
+    def image_tag(self):
+        if self.image:
+            return mark_safe(f'<img src="/{self.image}" width="150" height="150" />')
+
+    image_tag.short_description = 'Image'
+
 
 class Comment(models.Model):
     comment = models.TextField('Комментарий', max_length=550)
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comment'
+        related_name='comments'
     )
     author = models.ForeignKey(
         User,
@@ -109,3 +120,6 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ('created_at',)
+
+    def __str__(self):
+        return self.author, self.post
