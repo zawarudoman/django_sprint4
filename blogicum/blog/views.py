@@ -14,25 +14,11 @@ from django.views.generic import (
 )
 
 from blog.forms import CommentForm, CreatePostForm, UserForm
+from blog.mixins import CommentFormMixin
 from blog.models import Category, Comment, Post, User
 from blog.utils import get_request
 
-
 PAGINATOR_NUM = 10
-
-
-class CommentFormMixin:
-    """Comment Mixin for delete and update view"""
-
-    model = Comment
-    pk_url_kwarg = 'comment_id'
-    template_name = 'blog/comment.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        """Сhecking the user for the authorship of the comment"""
-        if self.get_object().author != self.request.user:
-            return redirect('blog:index')
-        return super().dispatch(request, *args, **kwargs)
 
 
 class IndexView(ListView):
@@ -44,9 +30,7 @@ class IndexView(ListView):
 
     def get_queryset(self):
         """Post"""
-        return get_request().annotate(
-            comment_count=Count('comments')
-        ).order_by('-pub_date')
+        return get_request().order_by('-pub_date')
 
 
 def category_posts(request, category_slug):
@@ -56,8 +40,7 @@ def category_posts(request, category_slug):
         slug=category_slug,
         is_published=True
     )
-    post = get_request().filter(category=category).annotate(
-        comment_count=Count('comments')).order_by('-pub_date')
+    post = get_request().filter(category=category).order_by('-pub_date')
     paginator = Paginator(post, PAGINATOR_NUM)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -77,13 +60,12 @@ class PostDetailViews(DetailView):
         post_object = super(PostDetailViews, self).get_object(
             queryset=queryset
         )
-        if post_object.author != self.request.user:
-            if (
+        if post_object.author != self.request.user and (
                 not post_object.is_published
                 or not post_object.category.is_published
                 or post_object.pub_date > timezone.now()
-            ):
-                raise Http404
+        ):
+            raise Http404
         return post_object
 
     def get_context_data(self, **kwargs):
@@ -146,8 +128,8 @@ class PostDeleteViews(LoginRequiredMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         """Сhecking the user for the authorship of the post"""
-        if not request.user.is_anonymous:
-            get_object_or_404(Post, pk=kwargs['post_id'], author=request.user)
+        if self.get_object().author != self.request.user:
+            return redirect('blog:post_detail', post_id=self.kwargs['post_id'])
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):

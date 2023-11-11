@@ -33,7 +33,7 @@ class PostAdmin(admin.ModelAdmin):
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
     list_display = ('name',)
-    search_fields = ['name']
+    search_fields = ('name',)
     list_filter = ('is_published', 'created_at')
 
 

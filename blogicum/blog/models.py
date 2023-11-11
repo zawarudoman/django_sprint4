@@ -1,10 +1,13 @@
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.urls import reverse
 from django.utils.html import mark_safe
+from django.contrib import admin
 
 User = get_user_model()
 
 NUMBER_OF_CHARACTERS_DISPLAYED = 25
+TEXT_CONSTANT = 5
 
 
 class PublishedAndCreated(models.Model):
@@ -94,16 +97,16 @@ class Post(PublishedAndCreated):
         return self.title[:NUMBER_OF_CHARACTERS_DISPLAYED]
 
     def get_absolute_url(self):
-        from django.urls import reverse
         return reverse('blog.detail', kwargs={'post_id': self.pk})
 
+    @admin.display(description='Image')
     def image_tag(self):
         if self.image:
             return mark_safe(
                 f'<img src="/{self.image}" width="150" height="150" />'
             )
 
-    image_tag.short_description = 'Image'
+    # image_tag.short_description = 'Image'
 
 
 class Comment(models.Model):
@@ -124,4 +127,4 @@ class Comment(models.Model):
         ordering = ('created_at',)
 
     def __str__(self):
-        return self.author, self.post
+        return f'{self.comment[:TEXT_CONSTANT]}, {self.author}'

@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.utils import timezone
 
 from blog.models import Post
@@ -11,5 +12,5 @@ def get_request():
     ).filter(
         is_published=True,
         category__is_published=True,
-        pub_date__lte=timezone.now()
-    )
+        pub_date__lte=timezone.now()).annotate(
+        comment_count=Count('comments'))
